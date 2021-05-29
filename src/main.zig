@@ -116,3 +116,93 @@ test "tint associated type" {
     // Capped does not add data to the type
     expectEqual(@sizeOf(u32), @sizeOf(Capped(u32, 10)));
 }
+
+pub fn Tagged(comptime T: type, comptime Tag: type, tag: Tag) type {
+    return struct {
+        const Self = This();
+
+        const tag: Tag = tag;
+
+        value: T,
+
+        pub fn tagged(item: T) Tagged(T, Tag, tag) {
+            return Tagged(T, Tag, tag){ .value = item };
+        }
+
+        pub fn untag(item: Tagged(T, Tag, tag)) T {
+            return item.value;
+        }
+
+        pub fn get_tag(item: Tagged(T, Tag, tag)) Tag {
+            return tag;
+        }
+    };
+}
+
+// I have not found a way to pass unknown tag information into a function.
+fn entype(comptime T: type, tagged: Tagged(T, TypeInfo, _)) type {
+    return @Type(tag);
+}
+
+test "tagged" {
+    var tagged: Tagged(u32, u8, 1) = Tagged(u32, u8, 1).tagged(10);
+
+    // the value inside the Tagged is availble
+    {
+        const expected: u32 = 10;
+        expectEqual(expected, tagged.untag());
+    }
+
+    // the tag itself can be retrieved
+    {
+        const expected: u8 = 1;
+        expectEqual(expected, tagged.get_tag());
+    }
+
+    var type_tag: Tagged(u32, TypeInfo, @typeInfo(u32)) = undefined;
+    // we can initial without repeating the type this way...
+    type_tag = @TypeOf(type_tag).tagged(100);
+
+    // NOTE there does not seem to be a way to do this...
+    //var typed: entype(u32, type_tag) = undefined;
+}
+
+pub fn TypeTagged(comptime T: type, comptime Tag: type) type {
+    return struct {
+        const Self = This();
+
+        const tag: [0]Tag = undefined;
+
+        value: T,
+
+        pub fn tagged(item: T) TypeTagged(T, Tag) {
+            return TypeTagged(T, Tag){ .value = item };
+        }
+
+        pub fn untag(item: TypeTagged(T, Tag)) T {
+            return item.value;
+        }
+
+        // NOTE dubious
+        pub fn get_tag(item: TypeTagged(T, Tag)) type {
+            return @typeInfo(@Type(tag)).Array.child;
+        }
+    };
+}
+
+test "type tagged" {
+    var tagged: TypeTagged(u32, i8) = TypeTagged(u32, i8).tagged(128);
+
+    // Typedefs are as easy as assignment- very nice.
+    const TypedefTag = TypeTagged(u32, i8);
+    var tagged2: TypedefTag = TypedefTag.tagged(128);
+
+    expectEqual(tagged.untag(), tagged2.untag());
+
+    // The tag does not increase the size of the type, as it is a 0 sized array.
+    expectEqual(@sizeOf(u32), @sizeOf(TypedefTag));
+
+    // NOTE These don't appear to work.
+    //expectEqual(@typeInfo(i8), @typeInfo(tagged.get_tag()));
+    //expectEqual(@typeInfo(i8), @typeInfo(@TypeOf(TypedefTag.tag)));
+}
