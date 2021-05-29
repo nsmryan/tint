@@ -185,7 +185,7 @@ pub fn TypeTagged(comptime T: type, comptime Tag: type) type {
 
         // NOTE dubious
         pub fn get_tag(item: TypeTagged(T, Tag)) type {
-            return @typeInfo(@Type(tag)).Array.child;
+            return @typeInfo(Tag).Array.child;
         }
     };
 }
