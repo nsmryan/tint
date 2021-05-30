@@ -11,8 +11,10 @@ const Declaration = std.builtin.TypeInfo.Declaration;
 
 // This will not work due to issue 2907, which forbids Enums being created from
 // @Type. This is an understandable limitation.
-//pub fn Capped(comptime max: usize) type l2
+//pub fn Capped(comptime max: usize) type {
 //    var fields: [max]EnumField = undefined;
+//
+//    // try to build enum fields at compile time?
 //    var index: usize = 0;
 //    while (index < max) : (index += 1) {
 //        fields[index] = EnumField{ .name = "", .value = index };
@@ -169,9 +171,9 @@ test "tagged" {
 
 pub fn TypeTagged(comptime T: type, comptime Tag: type) type {
     return struct {
-        const Self = This();
+        const Self = @This();
 
-        const tag: [0]Tag = undefined;
+        tag: [0]Tag = undefined,
 
         value: T,
 
@@ -184,10 +186,15 @@ pub fn TypeTagged(comptime T: type, comptime Tag: type) type {
         }
 
         // NOTE dubious
-        pub fn get_tag(item: TypeTagged(T, Tag)) type {
-            return @typeInfo(Tag).Array.child;
+        pub fn get_tag(item: Self) type {
+            return @typeInfo(@Type(item.tag)).Array.child;
         }
     };
+}
+
+// Partial type application is simply a function definition with comptime parameters
+fn Tagi8(comptime T: type) type {
+    return TypeTagged(T, i8);
 }
 
 test "type tagged" {
@@ -205,4 +212,7 @@ test "type tagged" {
     // NOTE These don't appear to work.
     //expectEqual(@typeInfo(i8), @typeInfo(tagged.get_tag()));
     //expectEqual(@typeInfo(i8), @typeInfo(@TypeOf(TypedefTag.tag)));
+
+    // try out the TypeTagged type partially applied to i8 as the tag.
+    var i8_tagged: Tagi8(u32) = Tagi8(u32){ .value = 1 };
 }
